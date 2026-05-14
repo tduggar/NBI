@@ -1,0 +1,23 @@
+ID,Title,Type,Status,Priority,Owner,Created Date,Last Updated,Target Date,Days in Current Status
+,── VALID VALUES ──,RFP | Partner | BD | Idea,Identified | Evaluating | In Progress | In Review | Finalizing | In Development | Validating | Passed | Shelved | Closed | No Award | No Contract | Scrapped,Critical | High | Medium | Low,,MM/DD/YYYY,MM/DD/YYYY,MM/DD/YYYY (optional),number
+,,,,,,,,,
+,,,,,,,,,
+RFP-001,WA mainframe RFI,RFP,In Review,Medium,Dennis,03/23/2026,05/13/2026,05/13/2026,1
+RFP-002,State of Illinois RFP - UI/UX,RFP,In Review,Medium,Dennis,03/23/2026,04/27/2026,,16
+RFP-003,State of Illinois RFP - MFaaS,RFP,In Review,Medium,Dennis,03/23/2026,04/27/2026,,16
+BD-001,UNL Landing Zone & PoC - Zion Collaboration,BD,In Development,High,Dennis,02/25/2026,05/11/2026,,2
+BD-002,Accreditation Tool - UNL Pilot,BD,Evaluating,Medium,John,03/31/2026,04/08/2026,,35
+RFP-004,State of South Carolina RFP - Mainframe O&M,RFP,Closed,Low,Dennis,03/23/2026,04/27/2026,,16
+IDR-001,Vibe Coding Deployment to Google,Idea,In Progress,Medium,Byron,02/25/2026,03/05/2026,,69
+PNR-001,Child Support Trainer,Partner,In Progress,High,John,02/25/2026,05/11/2026,,2
+IDR-002,Vibe Coding Deployment to AWS,Idea,Identified,Low,Byron,02/25/2026,03/05/2026,,69
+IDR-003,Cycling Without Age - Scheduling App,Idea,Shelved,Low,Byron,02/25/2026,03/05/2026,,69
+IDR-004,Assess GrantPro Modernization Opportunities,Idea,Identified,Medium,Byron,02/25/2026,04/27/2026,,16
+PNR-002,Virtual Path (GTN Proj #2),Partner,Evaluating,Medium,Melissa,02/25/2026,04/08/2026,,35
+IDR-004,Claude Code for Existing Products,Idea,Identified,Low,Dennis,02/25/2026,03/05/2026,,69
+IDR-005,Reimagine - ScholarNet,Idea,Identified,Medium,,05/05/2026,05/05/2026,,8
+IDR-006,College Navigator,Idea,In Review,Low,Byron,05/05/2026,05/12/2026,,2
+IDR-007,Professional Seal Verification,Idea,Identified,Low,,05/05/2026,05/05/2026,,8
+IDR-008,Configurable AI Base Platform,Idea,Identified,Low,Isaac,05/05/2026,05/05/2026,,8
+IDR-009,Nelnet Labs,Idea,Identified,Low,Byron,05/05/2026,05/05/2026,,8
+PNR-003,Louisiana child support with Northwoods,Partner,Evaluating,low,Dennis,05/12/2026,05/12/2026,,2
