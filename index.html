@@ -257,6 +257,15 @@
     color: var(--text-muted);
     margin-top: 4px;
   }
+  .metric-card { cursor: pointer; transition: box-shadow .15s, transform .15s; }
+  .metric-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  .metric-card.selected { outline: 2px solid; outline-offset: 2px; }
+  .metric-card.blue.selected  { outline-color: var(--accent); }
+  .metric-card.green.selected { outline-color: #36b37e; }
+  .metric-card.orange.selected{ outline-color: #ff8b00; }
+  .metric-card.gray.selected  { outline-color: #6b778c; }
+  .metric-card.purple.selected{ outline-color: #5243aa; }
+  .metric-card .click-hint { font-size: 10px; color: var(--text-light); margin-top: 6px; }
 
   .section-title {
     font-size: 15px;
@@ -817,6 +826,24 @@ function daysLabel(n) {
 })();
 
 // ─────────────────────────────────────────────
+// CARD FILTER STATE
+// ─────────────────────────────────────────────
+let cardFilter = null; // key of currently selected metric card
+
+const CARD_FILTERS = {
+  'Total Items':    () => true,
+  'Active Work':    i => i.is_active,
+  'Backlog':        i => i.status === 'Identified' || i.status === 'Evaluating',
+  'Closed / Done':  i => i.is_closed,
+  'Critical / High':i => (i.priority === 'Critical' || i.priority === 'High') && i.is_active,
+};
+
+function selectCard(label) {
+  cardFilter = cardFilter === label ? null : label;
+  renderCurrent();
+}
+
+// ─────────────────────────────────────────────
 // RENDER EXECUTIVE SUMMARY
 // ─────────────────────────────────────────────
 function renderSummary(items) {
@@ -824,28 +851,32 @@ function renderSummary(items) {
   const closed  = items.filter(i => i.is_closed);
   const total   = items.length;
 
-  // Metric cards
+  // Metric cards — always reflect full global filter, not card filter
   const metricsEl = document.getElementById('metric-cards');
   const metrics = [
-    { label:'Total Items',    value: total,         sub: 'across all types',            cls:'blue' },
-    { label:'Active Work',    value: active.length, sub: 'items in progress',           cls:'green' },
+    { label:'Total Items',    value: total,         sub: 'across all types',           cls:'blue' },
+    { label:'Active Work',    value: active.length, sub: 'items in progress',          cls:'green' },
     { label:'Backlog',        value: items.filter(i => i.status === 'Identified' || i.status === 'Evaluating').length,
-                                                    sub: 'Identified + Evaluating',     cls:'orange' },
-    { label:'Closed / Done',  value: closed.length, sub: 'completed or exited',         cls:'gray' },
+                                                    sub: 'Identified + Evaluating',    cls:'orange' },
+    { label:'Closed / Done',  value: closed.length, sub: 'completed or exited',        cls:'gray' },
     { label:'Critical / High',value: items.filter(i => (i.priority==='Critical'||i.priority==='High') && i.is_active).length,
-                                                    sub: 'active high-priority items',  cls:'purple' },
+                                                    sub: 'active high-priority items', cls:'purple' },
   ];
   metricsEl.innerHTML = metrics.map(m => `
-    <div class="metric-card ${m.cls}">
+    <div class="metric-card ${m.cls}${cardFilter === m.label ? ' selected' : ''}" onclick="selectCard('${m.label}')">
       <div class="label">${m.label}</div>
       <div class="value">${m.value}</div>
       <div class="sub">${m.sub}</div>
+      <div class="click-hint">${cardFilter === m.label ? '✕ click to clear filter' : 'click to filter charts'}</div>
     </div>`).join('');
+
+  // Apply card filter to charts
+  const chartItems = cardFilter ? items.filter(CARD_FILTERS[cardFilter]) : items;
 
   // Status chart
   const statusCounts = {};
   ALL_STATUSES.forEach(s => { statusCounts[s] = 0; });
-  items.forEach(i => { if (statusCounts[i.status] !== undefined) statusCounts[i.status]++; });
+  chartItems.forEach(i => { if (statusCounts[i.status] !== undefined) statusCounts[i.status]++; });
   const maxCount = Math.max(...Object.values(statusCounts), 1);
 
   const statusColors = {
@@ -888,7 +919,7 @@ function renderSummary(items) {
     typeGroupCounts[t] = {};
     STATUS_GROUPS.forEach(g => { typeGroupCounts[t][g.label] = 0; });
   });
-  items.forEach(i => {
+  chartItems.forEach(i => {
     if (!typeGroupCounts[i.type]) return;
     const group = STATUS_GROUPS.find(g => g.statuses.includes(i.status));
     if (group) typeGroupCounts[i.type][group.label]++;
@@ -920,7 +951,7 @@ function renderSummary(items) {
   // Recently closed
   const sinceVal = document.getElementById('recent-since').value;
   const sinceDate = sinceVal ? new Date(sinceVal) : null;
-  const recentClosed = items
+  const recentClosed = chartItems
     .filter(i => i.is_closed && (!sinceDate || new Date(i.last_updated) >= sinceDate))
     .sort((a,b) => new Date(b.last_updated) - new Date(a.last_updated));
 
