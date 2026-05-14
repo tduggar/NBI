@@ -159,6 +159,43 @@
   .cfg-clear { margin-right: auto; background: none; border: none; font-size: 12px; color: var(--text-muted); cursor: pointer; padding: 6px 0; }
   .cfg-clear:hover { color: var(--p-high); }
 
+  /* email summary modal */
+  .email-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.45); z-index: 300;
+    align-items: flex-start; justify-content: center; padding: 24px 20px;
+    overflow-y: auto;
+  }
+  .email-overlay.open { display: flex; }
+  .email-modal {
+    background: var(--surface); border-radius: 8px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    width: 100%; max-width: 620px;
+    animation: slide-up .2s ease;
+    overflow: hidden; flex-shrink: 0;
+  }
+  .email-modal-header {
+    padding: 18px 24px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .email-modal-header h2 { font-size: 15px; font-weight: 700; }
+  .email-preview {
+    margin: 20px 24px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: #fafafa; padding: 20px 24px;
+    font-family: Arial, sans-serif; font-size: 13px;
+    line-height: 1.7; color: #222;
+    max-height: 420px; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .email-actions {
+    padding: 14px 24px 20px;
+    display: flex; gap: 8px; justify-content: flex-end;
+    border-top: 1px solid var(--border);
+  }
+  .copy-confirm { font-size: 12px; color: var(--partner); align-self: center; margin-right: auto; display: none; }
+
   /* import error banner */
   .import-banner {
     display: none;
@@ -599,6 +636,7 @@
   <div class="toolbar">
     <span class="data-source-tag" id="data-source-tag">Mock data</span>
     <button class="btn btn-ghost" id="btn-refresh" onclick="refreshFromSource()" style="display:none">↺ Refresh</button>
+    <button class="btn btn-ghost" onclick="openEmailSummary()">Email Summary</button>
     <button class="btn btn-ghost" onclick="downloadTemplate()">Download Template</button>
     <label class="btn btn-ghost btn-upload">
       Import CSV
@@ -610,6 +648,22 @@
 <div class="import-banner" id="import-banner">
   <span id="import-banner-msg"></span>
   <button onclick="document.getElementById('import-banner').classList.remove('show')">✕</button>
+</div>
+
+<!-- EMAIL SUMMARY MODAL -->
+<div class="email-overlay" id="email-overlay">
+  <div class="email-modal">
+    <div class="email-modal-header">
+      <h2>Email Summary</h2>
+      <button class="modal-close" onclick="closeEmailSummary()">✕</button>
+    </div>
+    <div class="email-preview" id="email-preview"></div>
+    <div class="email-actions">
+      <span class="copy-confirm" id="copy-confirm">Copied to clipboard!</span>
+      <button class="btn btn-ghost" onclick="copyEmailSummary()">Copy to Clipboard</button>
+      <button class="btn btn-primary" onclick="openEmailClient()">Open in Email</button>
+    </div>
+  </div>
 </div>
 
 <!-- DATA SOURCE CONFIG MODAL -->
@@ -666,7 +720,7 @@
     <option>Identified</option>
     <option>Evaluating</option>
     <option>In Progress</option>
-    <option>In Review</option>
+    <option>Stakeholder Review</option>
     <option>Finalizing</option>
     <option>In Development</option>
     <option>Validating</option>
@@ -753,7 +807,7 @@
 // STATUS MODEL (source of truth)
 // ─────────────────────────────────────────────
 const ACTIVE_STATUSES = [
-  'Identified', 'Evaluating', 'In Progress', 'In Review',
+  'Identified', 'Evaluating', 'In Progress', 'Stakeholder Review',
   'Finalizing', 'In Development', 'Validating'
 ];
 const CLOSED_STATUSES = ['Passed', 'Shelved', 'Closed', 'No Award', 'No Contract', 'Scrapped'];
@@ -762,7 +816,7 @@ const KANBAN_ORDER = [...ACTIVE_STATUSES, ...CLOSED_STATUSES];
 
 const STATUS_GROUPS = [
   { label: 'Backlog',      color: '#0052cc', statuses: ['Identified', 'Evaluating'] },
-  { label: 'Active Work',  color: '#006644', statuses: ['In Progress', 'In Review', 'Finalizing', 'In Development', 'Validating'] },
+  { label: 'Active Work',  color: '#006644', statuses: ['In Progress', 'Stakeholder Review', 'Finalizing', 'In Development', 'Validating'] },
   { label: 'Closed/Done', color: '#36b37e', statuses: ['Passed', 'Shelved', 'Closed', 'No Award', 'No Contract', 'Scrapped'] },
 ];
 
@@ -881,7 +935,7 @@ function renderSummary(items) {
 
   const statusColors = {
     'Identified':'#0052cc','Evaluating':'#0747a6','In Progress':'#006644',
-    'In Review':'#00875a','Finalizing':'#5243aa','In Development':'#8777d9',
+    'Stakeholder Review':'#00875a','Finalizing':'#5243aa','In Development':'#8777d9',
     'Validating':'#ff8b00','Passed':'#36b37e','Shelved':'#6b778c',
     'Closed':'#97a0af','No Award':'#de350b','No Contract':'#ff5630','Scrapped':'#bf2600'
   };
@@ -1095,6 +1149,118 @@ document.getElementById('modal-overlay').addEventListener('click', e => {
 });
 
 // ─────────────────────────────────────────────
+// EMAIL SUMMARY
+// ─────────────────────────────────────────────
+function buildEmailText() {
+  const items = getFiltered();
+  const today = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  const url   = window.location.href;
+
+  const active = items.filter(i => i.is_active);
+  const closed = items.filter(i => i.is_closed);
+  const backlog = items.filter(i => i.status === 'Identified' || i.status === 'Evaluating');
+
+  // Status counts per group
+  const statusCounts = {};
+  ALL_STATUSES.forEach(s => { statusCounts[s] = 0; });
+  items.forEach(i => { if (statusCounts[i.status] !== undefined) statusCounts[i.status]++; });
+
+  // Type + group counts
+  const typeList = ['RFP', 'Partner', 'BD', 'Idea'];
+  const typeGroupCounts = {};
+  typeList.forEach(t => {
+    typeGroupCounts[t] = {};
+    STATUS_GROUPS.forEach(g => { typeGroupCounts[t][g.label] = 0; });
+  });
+  items.forEach(i => {
+    if (!typeGroupCounts[i.type]) return;
+    const group = STATUS_GROUPS.find(g => g.statuses.includes(i.status));
+    if (group) typeGroupCounts[i.type][group.label]++;
+  });
+
+  // Recently closed (last 30 days)
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+  const recentClosed = items
+    .filter(i => i.is_closed && new Date(i.last_updated) >= cutoff)
+    .sort((a, b) => new Date(b.last_updated) - new Date(a.last_updated))
+    .slice(0, 10);
+
+  const divider = '─'.repeat(48);
+
+  let lines = [];
+  lines.push('NB&I Dashboard Summary');
+  lines.push(today);
+  lines.push('');
+  lines.push(divider);
+  lines.push('OVERVIEW');
+  lines.push(divider);
+  lines.push(`Total Items:   ${items.length}`);
+  lines.push(`Backlog:       ${backlog.length}  (Identified + Evaluating)`);
+  lines.push(`Active Work:   ${active.length}`);
+  lines.push(`Closed / Done: ${closed.length}`);
+  lines.push('');
+  lines.push(divider);
+  lines.push('ITEMS BY STATUS');
+  lines.push(divider);
+  STATUS_GROUPS.forEach(group => {
+    const groupTotal = group.statuses.reduce((s, st) => s + (statusCounts[st] || 0), 0);
+    lines.push(`${group.label.toUpperCase()} (${groupTotal})`);
+    group.statuses.forEach(s => {
+      if (statusCounts[s] > 0) lines.push(`  ${s}: ${statusCounts[s]}`);
+    });
+    lines.push('');
+  });
+  lines.push(divider);
+  lines.push('ITEMS BY TYPE');
+  lines.push(divider);
+  typeList.forEach(type => {
+    const g = STATUS_GROUPS.map(g => `${g.label}: ${typeGroupCounts[type][g.label]}`).join('  |  ');
+    const total = STATUS_GROUPS.reduce((s, gr) => s + typeGroupCounts[type][gr.label], 0);
+    lines.push(`${type.padEnd(8)} ${g}  |  Total: ${total}`);
+  });
+  if (recentClosed.length > 0) {
+    lines.push('');
+    lines.push(divider);
+    lines.push('RECENTLY CLOSED (last 30 days)');
+    lines.push(divider);
+    recentClosed.forEach(i => {
+      lines.push(`[${i.type}] ${i.title} — ${i.status} (${fmtDate(i.last_updated)})`);
+    });
+  }
+  lines.push('');
+  lines.push(divider);
+  lines.push(`View the full dashboard: ${url}`);
+  lines.push(divider);
+
+  return lines.join('\n');
+}
+
+function openEmailSummary() {
+  document.getElementById('email-preview').textContent = buildEmailText();
+  document.getElementById('copy-confirm').style.display = 'none';
+  document.getElementById('email-overlay').classList.add('open');
+}
+function closeEmailSummary() {
+  document.getElementById('email-overlay').classList.remove('open');
+}
+function copyEmailSummary() {
+  navigator.clipboard.writeText(buildEmailText()).then(() => {
+    const el = document.getElementById('copy-confirm');
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 3000);
+  });
+}
+function openEmailClient() {
+  const text = buildEmailText();
+  const subject = encodeURIComponent('NB&I Dashboard Summary — ' + new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }));
+  const body = encodeURIComponent(text);
+  window.location.href = `mailto:?subject=${subject}&body=${body}`;
+}
+document.getElementById('email-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('email-overlay')) closeEmailSummary();
+});
+
+// ─────────────────────────────────────────────
 // DRILL-THROUGH: status bar → kanban
 // ─────────────────────────────────────────────
 function drillToKanban(status) {
@@ -1164,7 +1330,7 @@ function downloadTemplate() {
     CSV_HEADERS,
     ['', '── VALID VALUES ──', VALID_TYPES, VALID_STATUSES, VALID_PRIORITY, '', 'MM/DD/YYYY', 'MM/DD/YYYY', 'MM/DD/YYYY (optional)', 'number'],
     [],
-    ['RFP-001', 'Example: State DOT Highway Corridor RFP', 'RFP', 'In Review', 'Critical', 'Sarah M.', '03/12/2026', '05/11/2026', '05/27/2026', '8'],
+    ['RFP-001', 'Example: State DOT Highway Corridor RFP', 'RFP', 'Stakeholder Review', 'Critical', 'Sarah M.', '03/12/2026', '05/11/2026', '05/27/2026', '8'],
     ['BD-001',  'Example: Midwest Rail Corridor Expansion', 'BD', 'In Progress', 'High', 'Tom R.', '04/08/2026', '05/12/2026', '', '14'],
     ['IDR-001', 'Example: AI Site Assessment Tool', 'Idea', 'Validating', 'Medium', 'Priya S.', '04/18/2026', '05/10/2026', '', '15'],
   ];
