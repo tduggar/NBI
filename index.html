@@ -740,6 +740,10 @@
   <!-- EXECUTIVE SUMMARY -->
   <div class="view active" id="view-summary">
     <div class="summary-grid" id="metric-cards"></div>
+    <div style="margin-bottom:24px">
+      <div class="section-title" style="margin-bottom:12px">Spend to Date <span class="badge" id="spend-known-badge">—</span></div>
+      <div class="summary-grid" id="spend-type-cards"></div>
+    </div>
     <div class="summary-row">
       <div class="chart-card">
         <div class="section-title">Items by Status</div>
@@ -847,6 +851,11 @@ function getFiltered() {
 // ─────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────
+function fmtCurrency(v) {
+  if (!v || isNaN(v) || Number(v) === 0) return '—';
+  return '$' + Number(v).toLocaleString('en-US');
+}
+
 function fmtDate(dateStr) {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
@@ -924,6 +933,27 @@ function renderSummary(items) {
       <div class="click-hint">${cardFilter === m.label ? '✕ click to clear filter' : 'click to filter charts'}</div>
     </div>`).join('');
 
+  // Spend to date cards — grouped by type
+  const typeList0 = ['RFP', 'Partner', 'BD', 'Idea'];
+  const typeColors0 = { RFP:'#5243aa', Partner:'#00875a', BD:'#0052cc', Idea:'#ff8b00' };
+  const spendByType = typeList0.map(type => {
+    const typeItems = items.filter(i => i.type === type);
+    const known = typeItems.filter(i => i.spend_to_date > 0);
+    const total = known.reduce((s, i) => s + i.spend_to_date, 0);
+    return { type, color: typeColors0[type], total, known: known.length, count: typeItems.length };
+  });
+  const spendTotalKnown = spendByType.reduce((s, g) => s + g.known, 0);
+  const spendTotalItems = spendByType.reduce((s, g) => s + g.count, 0);
+  const spendGrandTotal = spendByType.reduce((s, g) => s + g.total, 0);
+  document.getElementById('spend-known-badge').textContent =
+    `${fmtCurrency(spendGrandTotal)} total · ${spendTotalKnown} of ${spendTotalItems} items`;
+  document.getElementById('spend-type-cards').innerHTML = spendByType.map(g => `
+    <div class="metric-card" style="border-top:3px solid ${g.color}">
+      <div class="label" style="color:${g.color}">${g.type}</div>
+      <div class="value" style="font-size:22px">${g.total > 0 ? fmtCurrency(g.total) : '—'}</div>
+      <div class="sub">${g.known} of ${g.count} item${g.count !== 1 ? 's' : ''} with spend</div>
+    </div>`).join('');
+
   // Apply card filter to charts
   const chartItems = cardFilter ? items.filter(CARD_FILTERS[cardFilter]) : items;
 
@@ -979,6 +1009,17 @@ function renderSummary(items) {
     if (group) typeGroupCounts[i.type][group.label]++;
   });
 
+  // Per-type opportunity value
+  const typeValueCounts = {};
+  typeList.forEach(t => { typeValueCounts[t] = { total: 0, known: 0 }; });
+  chartItems.forEach(i => {
+    if (!typeValueCounts[i.type]) return;
+    if (i.spend_to_date > 0) {
+      typeValueCounts[i.type].total += i.spend_to_date;
+      typeValueCounts[i.type].known++;
+    }
+  });
+
   document.getElementById('type-chart').innerHTML = typeList.map(type => {
     const groupVals = STATUS_GROUPS.map(g => typeGroupCounts[type][g.label]);
     const typeTotal = groupVals.reduce((a, b) => a + b, 0);
@@ -990,6 +1031,10 @@ function renderSummary(items) {
       <span class="type-group-chip" style="color:${g.color};border-color:${g.color};background:${g.color}18">
         ${g.label}: ${groupVals[gi]}
       </span>`).join('');
+    const tv = typeValueCounts[type];
+    const valueLine = tv.total > 0
+      ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px">Spend to date: ${fmtCurrency(tv.total)} across ${tv.known} item${tv.known !== 1 ? 's' : ''}</div>`
+      : `<div style="font-size:12px;color:var(--text-light);margin-top:4px">No spend entered</div>`;
     return `
       <div class="type-row">
         <div class="type-row-header">
@@ -999,6 +1044,7 @@ function renderSummary(items) {
         </div>
         <div class="type-stacked-bar">${stackedSegs}</div>
         <div class="type-group-counts">${chips}</div>
+        ${valueLine}
       </div>`;
   }).join('');
 
@@ -1114,6 +1160,10 @@ function openModal(id) {
         <div class="field-value">${fmtDate(item.target_date)}</div>
       </div>
       <div class="modal-field">
+        <div class="field-label">Spend to Date</div>
+        <div class="field-value" style="font-weight:600;color:var(--partner)">${item.spend_to_date > 0 ? fmtCurrency(item.spend_to_date) : '—'}</div>
+      </div>
+      <div class="modal-field">
         <div class="field-label">Days in Status</div>
         <div class="field-value">${daysLabel(item.days_in_status)}</div>
       </div>
@@ -1198,6 +1248,18 @@ function buildEmailText() {
   lines.push(`Backlog:       ${backlog.length}  (Identified + Evaluating)`);
   lines.push(`Active Work:   ${active.length}`);
   lines.push(`Closed / Done: ${closed.length}`);
+  lines.push('');
+  lines.push(divider);
+  lines.push('SPEND TO DATE');
+  lines.push(divider);
+  ['RFP','Partner','BD','Idea'].forEach(type => {
+    const typeItems = items.filter(i => i.type === type);
+    const known = typeItems.filter(i => i.spend_to_date > 0);
+    const total = known.reduce((s, i) => s + i.spend_to_date, 0);
+    lines.push(`${type.padEnd(10)} ${total > 0 ? fmtCurrency(total) : '—'}  (${known.length} of ${typeItems.length} items with spend)`);
+  });
+  const grandTotal = items.filter(i => i.spend_to_date > 0).reduce((s, i) => s + i.spend_to_date, 0);
+  lines.push(`${'TOTAL'.padEnd(10)} ${fmtCurrency(grandTotal)}`);
   lines.push('');
   lines.push(divider);
   lines.push('ITEMS BY STATUS');
@@ -1314,7 +1376,7 @@ function renderCurrent() {
 // ─────────────────────────────────────────────
 // CSV TEMPLATE DOWNLOAD
 // ─────────────────────────────────────────────
-const CSV_HEADERS = ['ID','Title','Type','Status','Priority','Owner','Created Date','Last Updated','Target Date','Days in Current Status'];
+const CSV_HEADERS = ['ID','Title','Type','Status','Priority','Owner','Created Date','Last Updated','Target Date','Days in Current Status','Spend to Date'];
 const VALID_TYPES     = 'RFP | Partner | BD | Idea';
 const VALID_STATUSES  = ALL_STATUSES.join(' | ');
 const VALID_PRIORITY  = 'Critical | High | Medium | Low';
@@ -1328,11 +1390,11 @@ function escCsv(v) {
 function downloadTemplate() {
   const rows = [
     CSV_HEADERS,
-    ['', '── VALID VALUES ──', VALID_TYPES, VALID_STATUSES, VALID_PRIORITY, '', 'MM/DD/YYYY', 'MM/DD/YYYY', 'MM/DD/YYYY (optional)', 'number'],
+    ['', '── VALID VALUES ──', VALID_TYPES, VALID_STATUSES, VALID_PRIORITY, '', 'MM/DD/YYYY', 'MM/DD/YYYY', 'MM/DD/YYYY (optional)', 'number', 'number (optional, no $ or commas)'],
     [],
-    ['RFP-001', 'Example: State DOT Highway Corridor RFP', 'RFP', 'Stakeholder Review', 'Critical', 'Sarah M.', '03/12/2026', '05/11/2026', '05/27/2026', '8'],
-    ['BD-001',  'Example: Midwest Rail Corridor Expansion', 'BD', 'In Progress', 'High', 'Tom R.', '04/08/2026', '05/12/2026', '', '14'],
-    ['IDR-001', 'Example: AI Site Assessment Tool', 'Idea', 'Validating', 'Medium', 'Priya S.', '04/18/2026', '05/10/2026', '', '15'],
+    ['RFP-001', 'Example: State DOT Highway Corridor RFP', 'RFP', 'Stakeholder Review', 'Critical', 'Sarah M.', '03/12/2026', '05/11/2026', '05/27/2026', '8', '1250000'],
+    ['BD-001',  'Example: Midwest Rail Corridor Expansion', 'BD', 'In Progress', 'High', 'Tom R.', '04/08/2026', '05/12/2026', '', '14', ''],
+    ['IDR-001', 'Example: AI Site Assessment Tool', 'Idea', 'Validating', 'Medium', 'Priya S.', '04/18/2026', '05/10/2026', '', '15', '750000'],
   ];
   const csv = rows.map(r => r.map(escCsv).join(',')).join('\r\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -1389,6 +1451,7 @@ function importCsv(text) {
     updated: headers.findIndex(h => h.includes('updated') || h.includes('last')),
     target:  headers.findIndex(h => h.includes('target')),
     days:    headers.findIndex(h => h.includes('days')),
+    value:   headers.findIndex(h => h.includes('spend')),
   };
 
   const imported = [];
@@ -1432,6 +1495,7 @@ function importCsv(text) {
       days_in_status: isNaN(daysVal) ? 0 : daysVal,
       total_cycle_time: isNaN(daysVal) ? 0 : daysVal,
       status_change_history: [{ s: status, days: isNaN(daysVal) ? 0 : daysVal }],
+      spend_to_date: idx.value >= 0 ? (parseFloat(String(cols[idx.value]).replace(/[$,]/g, '')) || 0) : 0,
     });
   }
 
@@ -1578,6 +1642,12 @@ document.addEventListener('keydown', e => {
 // ─────────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────────
+// Default "Closed since" to 14 days ago
+(function setDefaultSinceDate() {
+  const d = new Date();
+  d.setDate(d.getDate() - 14);
+  document.getElementById('recent-since').value = d.toISOString().split('T')[0];
+})();
 renderCurrent();
 
 // 1. Try same-origin nbi-data.csv first (Netlify co-deploy — no CORS issues)
