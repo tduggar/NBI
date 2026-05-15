@@ -474,50 +474,85 @@
     padding-bottom: 16px;
   }
   .kanban-board {
-    display: flex;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: 90px repeat(13, 220px);
     min-width: max-content;
-    align-items: flex-start;
-  }
-  .kanban-col {
-    width: 220px;
-    flex-shrink: 0;
-    background: var(--surface-2);
-    border-radius: var(--radius);
     border: 1px solid var(--border);
+    border-radius: var(--radius);
     overflow: hidden;
   }
-  .kanban-col.closed-col { opacity: .85; }
-  .col-header {
-    padding: 10px 12px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--border);
+  /* header row cells */
+  .sl-corner {
     background: var(--surface);
+    border-right: 1px solid var(--border);
+    border-bottom: 2px solid var(--border);
+    padding: 8px 6px;
+    position: sticky;
+    left: 0;
+    z-index: 2;
   }
-  .col-header .col-name {
-    font-size: 12px;
-    font-weight: 600;
+  .sl-col-header {
+    padding: 8px 10px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    border-bottom: 2px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+  }
+  .sl-col-header.closed-header { opacity: .75; }
+  .sl-col-name {
+    font-size: 11px;
+    font-weight: 700;
     color: var(--text);
     text-transform: uppercase;
     letter-spacing: .4px;
+    line-height: 1.2;
   }
-  .col-header .col-count {
+  .sl-col-count {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  /* swimlane row label */
+  .sl-row-label {
+    padding: 10px 6px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--surface);
+  }
+  .sl-row-label span {
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
     font-size: 11px;
     font-weight: 700;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    width: 22px; height: 22px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    white-space: nowrap;
   }
-  .kanban-col.has-items .col-header { border-top: 3px solid var(--accent); }
-  .kanban-col.closed-col.has-items .col-header { border-top: 3px solid var(--text-muted); }
-  .col-cards { padding: 8px; display: flex; flex-direction: column; gap: 6px; min-height: 60px; }
+  /* individual status cell within a swimlane */
+  .sl-cell {
+    padding: 6px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-height: 80px;
+    background: var(--bg);
+  }
+  .sl-cell.closed-cell { background: var(--surface-2); opacity: .85; }
+  .sl-cell-empty { color: var(--text-muted); font-size: 12px; text-align: center; padding-top: 20px; }
+  /* legacy classes kept for card rendering */
+  .col-header { display: none; }
+  .col-cards { display: contents; }
 
   .kanban-card {
     background: var(--surface);
@@ -1194,45 +1229,77 @@ function renderSummary(items) {
 }
 
 // ─────────────────────────────────────────────
-// RENDER KANBAN
+// RENDER KANBAN (swimlanes by type)
 // ─────────────────────────────────────────────
+const SWIMLANE_TYPES = [
+  { label: 'RFP',     color: '#5243aa' },
+  { label: 'Partner', color: '#00875a' },
+  { label: 'BD',      color: '#0052cc' },
+  { label: 'Idea',    color: '#ff8b00' },
+];
+
+function cardHtml(item) {
+  return `
+    <div class="kanban-card p-${priorityClass(item.priority)}" onclick="openModal('${item.id}')">
+      <div class="card-title">${item.title}</div>
+      ${item.description ? `<div style="font-size:11px;color:var(--text-muted);margin:4px 0 2px;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${item.description}</div>` : ''}
+      ${item.notes ? `<div style="font-size:11px;color:var(--text-light);font-style:italic;margin-bottom:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical">Note: ${item.notes}</div>` : ''}
+      <div class="card-meta" style="margin-top:6px">
+        <div class="card-owner">${item.owner}</div>
+        <div class="card-days ${item.days_in_status > 21 ? 'overdue' : ''}">${daysLabel(item.days_in_status)}</div>
+      </div>
+    </div>`;
+}
+
 function renderKanban(items) {
   const board = document.getElementById('kanban-board');
-  const byStatus = {};
-  KANBAN_ORDER.forEach(s => { byStatus[s] = []; });
+
+  // build byTypeStatus map
+  const byTypeStatus = {};
+  SWIMLANE_TYPES.forEach(t => {
+    byTypeStatus[t.label] = {};
+    KANBAN_ORDER.forEach(s => { byTypeStatus[t.label][s] = []; });
+  });
   items.forEach(item => {
-    if (byStatus[item.status] !== undefined) byStatus[item.status].push(item);
+    const row = byTypeStatus[item.type];
+    if (row && row[item.status] !== undefined) row[item.status].push(item);
   });
 
-  board.innerHTML = KANBAN_ORDER.map(status => {
-    const cards = byStatus[status];
+  // per-status totals (across all types)
+  const statusTotals = {};
+  KANBAN_ORDER.forEach(s => {
+    statusTotals[s] = SWIMLANE_TYPES.reduce((n, t) => n + byTypeStatus[t.label][s].length, 0);
+  });
+
+  // header row: corner + one cell per status
+  const headerCells = KANBAN_ORDER.map(status => {
     const isClosed = CLOSED_STATUSES.includes(status);
-    const hasItems = cards.length > 0;
-    return `
-      <div class="kanban-col ${isClosed ? 'closed-col' : ''} ${hasItems ? 'has-items' : ''}">
-        <div class="col-header">
-          <div class="col-name">${status}</div>
-          <div class="col-count">${cards.length}</div>
-        </div>
-        <div class="col-cards">
-          ${cards.length === 0
-            ? `<div class="empty-col">—</div>`
-            : cards.map(item => `
-              <div class="kanban-card p-${priorityClass(item.priority)}" onclick="openModal('${item.id}')">
-                <div class="card-title">${item.title}</div>
-                ${item.description ? `<div style="font-size:11px;color:var(--text-muted);margin:4px 0 2px;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${item.description}</div>` : ''}
-                ${item.notes ? `<div style="font-size:11px;color:var(--text-light);font-style:italic;margin-bottom:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical">Note: ${item.notes}</div>` : ''}
-                <div class="card-tags" style="margin-top:6px">
-                  <span class="tag tag-${typeClass(item.type)}">${item.type}</span>
-                </div>
-                <div class="card-meta">
-                  <div class="card-owner">${item.owner}</div>
-                  <div class="card-days ${item.days_in_status > 21 ? 'overdue' : ''}">${daysLabel(item.days_in_status)}</div>
-                </div>
-              </div>`).join('')}
-        </div>
-      </div>`;
+    return `<div class="sl-col-header ${isClosed ? 'closed-header' : ''}">
+      <div class="sl-col-name">${status}</div>
+      <div class="sl-col-count">${statusTotals[status]}</div>
+    </div>`;
   }).join('');
+
+  // swimlane rows
+  const rows = SWIMLANE_TYPES.map(t => {
+    const cells = KANBAN_ORDER.map(status => {
+      const cards = byTypeStatus[t.label][status];
+      const isClosed = CLOSED_STATUSES.includes(status);
+      return `<div class="sl-cell ${isClosed ? 'closed-cell' : ''}">
+        ${cards.length === 0
+          ? `<div class="sl-cell-empty">—</div>`
+          : cards.map(cardHtml).join('')}
+      </div>`;
+    }).join('');
+    return `
+      <div class="sl-row-label" style="border-left:3px solid ${t.color}">
+        <span style="color:${t.color}">${t.label}</span>
+      </div>
+      ${cells}`;
+  }).join('');
+
+  board.innerHTML =
+    `<div class="sl-corner"></div>${headerCells}${rows}`;
 
   document.getElementById('filter-count').textContent = `${items.length} item${items.length !== 1 ? 's' : ''}`;
 }
