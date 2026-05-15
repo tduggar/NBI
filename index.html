@@ -1220,7 +1220,9 @@ function renderKanban(items) {
             : cards.map(item => `
               <div class="kanban-card p-${priorityClass(item.priority)}" onclick="openModal('${item.id}')">
                 <div class="card-title">${item.title}</div>
-                <div class="card-tags">
+                ${item.description ? `<div style="font-size:11px;color:var(--text-muted);margin:4px 0 2px;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${item.description}</div>` : ''}
+                ${item.notes ? `<div style="font-size:11px;color:var(--text-light);font-style:italic;margin-bottom:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical">Note: ${item.notes}</div>` : ''}
+                <div class="card-tags" style="margin-top:6px">
                   <span class="tag tag-${typeClass(item.type)}">${item.type}</span>
                 </div>
                 <div class="card-meta">
@@ -1291,6 +1293,16 @@ function openModal(id) {
         <div class="field-value">${daysLabel(item.total_cycle_time)}</div>
       </div>
     </div>
+    ${item.description ? `
+    <div class="modal-field" style="grid-column:1/-1;margin-bottom:8px">
+      <div class="field-label">Description</div>
+      <div class="field-value" style="white-space:pre-wrap;line-height:1.6">${item.description}</div>
+    </div>` : ''}
+    ${item.notes ? `
+    <div class="modal-field" style="grid-column:1/-1;margin-bottom:8px">
+      <div class="field-label">Notes</div>
+      <div class="field-value" style="white-space:pre-wrap;line-height:1.6;color:var(--text-muted)">${item.notes}</div>
+    </div>` : ''}
     <div class="timeline-section">
       <div class="section-label">Status Timeline</div>
       <div class="timeline">
@@ -1507,7 +1519,7 @@ function renderCurrent() {
 // ─────────────────────────────────────────────
 // CSV TEMPLATE DOWNLOAD
 // ─────────────────────────────────────────────
-const CSV_HEADERS = ['ID','Title','Type','Status','Priority','Owner','Created Date','Last Updated','Target Date','Days in Current Status','Spend to Date'];
+const CSV_HEADERS = ['ID','Title','Type','Status','Priority','Owner','Created Date','Last Updated','Target Date','Days in Current Status','Spend to Date','Description','Notes'];
 const VALID_TYPES     = 'RFP | Partner | BD | Idea';
 const VALID_STATUSES  = ALL_STATUSES.join(' | ');
 const VALID_PRIORITY  = 'Critical | High | Medium | Low';
@@ -1583,6 +1595,8 @@ function importCsv(text) {
     target:  headers.findIndex(h => h.includes('target')),
     days:    headers.findIndex(h => h.includes('days')),
     value:   headers.findIndex(h => h.includes('spend')),
+    desc:    headers.findIndex(h => h.includes('description')),
+    notes:   headers.findIndex(h => h.includes('notes')),
   };
 
   const imported = [];
@@ -1627,6 +1641,8 @@ function importCsv(text) {
       total_cycle_time: isNaN(daysVal) ? 0 : daysVal,
       status_change_history: [{ s: status, days: isNaN(daysVal) ? 0 : daysVal }],
       spend_to_date: idx.value >= 0 ? (parseFloat(String(cols[idx.value]).replace(/[$,]/g, '')) || 0) : 0,
+      description: idx.desc  >= 0 ? (cols[idx.desc]  || '').trim() : '',
+      notes:       idx.notes >= 0 ? (cols[idx.notes] || '').trim() : '',
     });
   }
 
