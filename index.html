@@ -25,6 +25,8 @@
     --bd-bg: #deebff;
     --idea: #ff8b00;
     --idea-bg: #fffae6;
+    --admin: #5e6c84;
+    --admin-bg: #ebecf0;
 
     /* Priority colors */
     --p-critical: #de350b;
@@ -453,6 +455,7 @@
   .tag-partner { background: var(--partner-bg); color: var(--partner); }
   .tag-bd    { background: var(--bd-bg);      color: var(--bd); }
   .tag-idea  { background: var(--idea-bg);    color: var(--idea); }
+  .tag-admin { background: var(--admin-bg);   color: var(--admin); }
 
   .tag-status-active { background: var(--s-active-bg); color: var(--s-active); }
   .tag-status-closed { background: var(--s-closed-bg); color: var(--s-closed); }
@@ -589,7 +592,7 @@
     padding: 1px 6px;
     border-radius: 20px;
   }
-  .kanban-card .card-days.overdue { color: var(--p-high); background: #fff5f3; }
+  .kanban-card .card-days { color: var(--text-muted); }
   .kanban-card .card-tags { display: flex; gap: 4px; flex-wrap: wrap; }
   .empty-col { text-align: center; padding: 16px 8px; font-size: 11px; color: var(--text-light); }
 
@@ -773,31 +776,16 @@
     <div class="guide-group">
       <span class="guide-group-label" style="color:#36b37e;border-color:#36b37e">Closed / Done</span>
       <div class="guide-item">
-        <div class="guide-status-name">Passed</div>
-        <div class="guide-status-def">The team decided not to pursue this opportunity due to low probability of win, poor fit, or limited capacity.</div>
-      </div>
-      <div class="guide-item">
-        <div class="guide-status-name">Shelved</div>
-        <div class="guide-status-def">Work has been paused and may be revisited when timing, capacity, or market conditions improve.</div>
-      </div>
-      <div class="guide-item">
         <div class="guide-status-name">Closed</div>
-        <div class="guide-status-def">The opportunity or idea has ended and will not be pursued further.</div>
-      </div>
-      <div class="guide-item">
-        <div class="guide-status-name">No Award</div>
-        <div class="guide-status-def">A proposal was submitted but the award was not granted.</div>
-        <div class="guide-status-note">Applies to RFPs only.</div>
-      </div>
-      <div class="guide-item">
-        <div class="guide-status-name">No Contract</div>
-        <div class="guide-status-def">An award was received but contract negotiations failed and no agreement could be reached.</div>
-        <div class="guide-status-note">Applies to RFPs only.</div>
-      </div>
-      <div class="guide-item">
-        <div class="guide-status-name">Scrapped</div>
-        <div class="guide-status-def">Terminated after evaluation or stakeholder review — this decision is final and the item will not be revisited.</div>
-        <div class="guide-status-note">Applies to Internal Ideas only.</div>
+        <div class="guide-status-def">The item has exited the active pipeline. A closure reason indicates how it ended:</div>
+        <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+          <div><span style="font-weight:600;font-size:12px">Passed</span> — <span style="font-size:12px;color:var(--text-muted)">The team decided not to pursue due to low probability of win, poor fit, or limited capacity.</span></div>
+          <div><span style="font-weight:600;font-size:12px">Shelved</span> — <span style="font-size:12px;color:var(--text-muted)">Work paused and may be revisited when timing, capacity, or market conditions improve.</span></div>
+          <div><span style="font-weight:600;font-size:12px">Closed</span> — <span style="font-size:12px;color:var(--text-muted)">The opportunity or idea has ended and will not be pursued further.</span></div>
+          <div><span style="font-weight:600;font-size:12px">No Award</span> — <span style="font-size:12px;color:var(--text-muted)">A proposal was submitted but the award was not granted. (RFPs only)</span></div>
+          <div><span style="font-weight:600;font-size:12px">No Contract</span> — <span style="font-size:12px;color:var(--text-muted)">An award was received but contract negotiations failed. (RFPs only)</span></div>
+          <div><span style="font-weight:600;font-size:12px">Scrapped</span> — <span style="font-size:12px;color:var(--text-muted)">Terminated after evaluation or stakeholder review — final, will not be revisited. (Ideas only)</span></div>
+        </div>
       </div>
     </div>
 
@@ -855,6 +843,7 @@
     <option value="Partner">Partner</option>
     <option value="BD">BD</option>
     <option value="Idea">Idea</option>
+    <option value="Admin">Admin</option>
   </select>
   <select id="f-owner">
     <option value="">All Owners</option>
@@ -879,12 +868,7 @@
     <option>In Development</option>
     <option>Validating</option>
     <option disabled>── Closed ──</option>
-    <option>Passed</option>
-    <option>Shelved</option>
     <option>Closed</option>
-    <option>No Award</option>
-    <option>No Contract</option>
-    <option>Scrapped</option>
   </select>
   <div class="sep"></div>
   <div class="filter-count" id="filter-count">— items</div>
@@ -968,14 +952,17 @@ const ACTIVE_STATUSES = [
   'Identified', 'Evaluating', 'In Progress', 'Stakeholder Review',
   'Finalizing', 'In Development', 'Validating'
 ];
-const CLOSED_STATUSES = ['Passed', 'Shelved', 'Closed', 'No Award', 'No Contract', 'Scrapped'];
+const CLOSED_STATUSES = ['Closed'];
+const CLOSURE_REASONS = ['Passed', 'Shelved', 'Closed', 'No Award', 'No Contract', 'Scrapped'];
+// Legacy values that auto-map to status=Closed on import
+const LEGACY_CLOSED = ['Passed', 'Shelved', 'No Award', 'No Contract', 'Scrapped'];
 const ALL_STATUSES = [...ACTIVE_STATUSES, ...CLOSED_STATUSES];
 const KANBAN_ORDER = [...ACTIVE_STATUSES, ...CLOSED_STATUSES];
 
 const STATUS_GROUPS = [
   { label: 'Backlog',      color: '#0052cc', statuses: ['Identified', 'Evaluating'] },
   { label: 'Active Work',  color: '#006644', statuses: ['In Progress', 'Stakeholder Review', 'Finalizing', 'In Development', 'Validating'] },
-  { label: 'Closed/Done', color: '#36b37e', statuses: ['Passed', 'Shelved', 'Closed', 'No Award', 'No Contract', 'Scrapped'] },
+  { label: 'Closed/Done',  color: '#36b37e', statuses: ['Closed'] },
 ];
 
 function isActive(status)  { return ACTIVE_STATUSES.includes(status); }
@@ -1017,11 +1004,16 @@ function fmtDate(dateStr) {
 }
 
 function typeClass(type) {
-  return { RFP:'rfp', Partner:'partner', BD:'bd', Idea:'idea' }[type] || 'bd';
+  return { RFP:'rfp', Partner:'partner', BD:'bd', Idea:'idea', Admin:'admin' }[type] || 'bd';
 }
 
 function priorityClass(p) {
   return p.toLowerCase();
+}
+
+function daysInStatus(item) {
+  if (!item.last_updated) return 0;
+  return Math.max(0, Math.floor((Date.now() - new Date(item.last_updated)) / 86400000));
 }
 
 function daysLabel(n) {
@@ -1088,8 +1080,8 @@ function renderSummary(items) {
     </div>`).join('');
 
   // Spend to date cards — grouped by type
-  const typeList0 = ['RFP', 'Partner', 'BD', 'Idea'];
-  const typeColors0 = { RFP:'#5243aa', Partner:'#00875a', BD:'#0052cc', Idea:'#ff8b00' };
+  const typeList0 = ['RFP', 'Partner', 'BD', 'Idea', 'Admin'];
+  const typeColors0 = { RFP:'#5243aa', Partner:'#00875a', BD:'#0052cc', Idea:'#ff8b00', Admin:'#5e6c84' };
   const spendByType = typeList0.map(type => {
     const typeItems = items.filter(i => i.type === type);
     const known = typeItems.filter(i => i.spend_to_date > 0);
@@ -1148,8 +1140,8 @@ function renderSummary(items) {
   }).join('');
 
   // Type chart
-  const typeColors = { RFP:'#5243aa', Partner:'#00875a', BD:'#0052cc', Idea:'#ff8b00' };
-  const typeList = ['RFP', 'Partner', 'BD', 'Idea'];
+  const typeColors = { RFP:'#5243aa', Partner:'#00875a', BD:'#0052cc', Idea:'#ff8b00', Admin:'#5e6c84' };
+  const typeList = ['RFP', 'Partner', 'BD', 'Idea', 'Admin'];
 
   // Per-type, per-group counts
   const typeGroupCounts = {};
@@ -1219,7 +1211,7 @@ function renderSummary(items) {
         <td style="color:var(--text-muted);font-size:12px">${item.id}</td>
         <td style="font-weight:500">${item.title}</td>
         <td><span class="tag tag-${typeClass(item.type)}">${item.type}</span></td>
-        <td><span class="tag tag-status-closed">${item.status}</span></td>
+        <td><span class="tag tag-status-closed">${item.closure_reason || item.status}</span></td>
         <td>${item.owner}</td>
         <td style="color:var(--text-muted)">${fmtDate(item.last_updated)}</td>
       </tr>`).join('');
@@ -1236,6 +1228,7 @@ const SWIMLANE_TYPES = [
   { label: 'Partner', color: '#00875a' },
   { label: 'BD',      color: '#0052cc' },
   { label: 'Idea',    color: '#ff8b00' },
+  { label: 'Admin',   color: '#5e6c84' },
 ];
 
 function cardHtml(item) {
@@ -1246,7 +1239,7 @@ function cardHtml(item) {
       ${item.notes ? `<div style="font-size:11px;color:var(--text-light);font-style:italic;margin-bottom:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical">Note: ${item.notes}</div>` : ''}
       <div class="card-meta" style="margin-top:6px">
         <div class="card-owner">${item.owner}</div>
-        <div class="card-days ${item.days_in_status > 21 ? 'overdue' : ''}">${daysLabel(item.days_in_status)}</div>
+        <div class="card-days">${daysLabel(daysInStatus(item))}</div>
       </div>
     </div>`;
 }
@@ -1325,7 +1318,7 @@ function openModal(id) {
     <div class="modal-row">
       <div class="modal-field">
         <div class="field-label">Status</div>
-        <div class="field-value">${statusTag}</div>
+        <div class="field-value">${statusTag}${item.closure_reason ? ` <span class="tag tag-status-closed" style="margin-left:4px">${item.closure_reason}</span>` : ''}</div>
       </div>
       <div class="modal-field">
         <div class="field-label">Type</div>
@@ -1353,11 +1346,11 @@ function openModal(id) {
       </div>
       <div class="modal-field">
         <div class="field-label">Days in Status</div>
-        <div class="field-value">${daysLabel(item.days_in_status)}</div>
+        <div class="field-value">${daysLabel(daysInStatus(item))}</div>
       </div>
       <div class="modal-field">
         <div class="field-label">Total Cycle Time</div>
-        <div class="field-value">${daysLabel(item.total_cycle_time)}</div>
+        <div class="field-value">${item.created_date ? daysLabel(Math.max(0, Math.floor((Date.now() - new Date(item.created_date)) / 86400000))) : '—'}</div>
       </div>
     </div>
     ${item.description ? `
@@ -1379,7 +1372,7 @@ function openModal(id) {
           return `
             <div class="timeline-step ${isFinal ? 'completed' : ''}">
               <div class="t-status">${step.s}</div>
-              <div class="t-meta">${daysLabel(step.days)}${isLast ? ' (current)' : ''}</div>
+              <div class="t-meta">${isLast ? daysLabel(daysInStatus(item)) + ' (current)' : ''}</div>
             </div>`;
         }).join('')}
       </div>
@@ -1426,7 +1419,7 @@ function buildEmailText() {
   items.forEach(i => { if (statusCounts[i.status] !== undefined) statusCounts[i.status]++; });
 
   // Type + group counts
-  const typeList = ['RFP', 'Partner', 'BD', 'Idea'];
+  const typeList = ['RFP', 'Partner', 'BD', 'Idea', 'Admin'];
   const typeGroupCounts = {};
   typeList.forEach(t => {
     typeGroupCounts[t] = {};
@@ -1462,7 +1455,7 @@ function buildEmailText() {
   lines.push(divider);
   lines.push('SPEND TO DATE');
   lines.push(divider);
-  ['RFP','Partner','BD','Idea'].forEach(type => {
+  ['RFP','Partner','BD','Idea','Admin'].forEach(type => {
     const typeItems = items.filter(i => i.type === type);
     const known = typeItems.filter(i => i.spend_to_date > 0);
     const total = known.reduce((s, i) => s + i.spend_to_date, 0);
@@ -1496,7 +1489,8 @@ function buildEmailText() {
     lines.push('RECENTLY CLOSED (last 30 days)');
     lines.push(divider);
     recentClosed.forEach(i => {
-      lines.push(`[${i.type}] ${i.title} — ${i.status} (${fmtDate(i.last_updated)})`);
+      const label = i.closure_reason ? `Closed — ${i.closure_reason}` : 'Closed';
+      lines.push(`[${i.type}] ${i.title} — ${label} (${fmtDate(i.last_updated)})`);
     });
   }
   lines.push('');
@@ -1586,9 +1580,10 @@ function renderCurrent() {
 // ─────────────────────────────────────────────
 // CSV TEMPLATE DOWNLOAD
 // ─────────────────────────────────────────────
-const CSV_HEADERS = ['ID','Title','Type','Status','Priority','Owner','Created Date','Last Updated','Target Date','Days in Current Status','Spend to Date','Description','Notes'];
-const VALID_TYPES     = 'RFP | Partner | BD | Idea';
+const CSV_HEADERS = ['ID','Title','Type','Status','Closure Reason','Priority','Owner','Created Date','Last Updated','Target Date','Spend to Date','Description','Notes'];
+const VALID_TYPES     = 'RFP | Partner | BD | Idea | Admin';
 const VALID_STATUSES  = ALL_STATUSES.join(' | ');
+const VALID_CLOSURE   = CLOSURE_REASONS.join(' | ');
 const VALID_PRIORITY  = 'Critical | High | Medium | Low';
 
 function escCsv(v) {
@@ -1600,11 +1595,11 @@ function escCsv(v) {
 function downloadTemplate() {
   const rows = [
     CSV_HEADERS,
-    ['', '── VALID VALUES ──', VALID_TYPES, VALID_STATUSES, VALID_PRIORITY, '', 'MM/DD/YYYY', 'MM/DD/YYYY', 'MM/DD/YYYY (optional)', 'number', 'number (optional, no $ or commas)'],
+    ['', '── VALID VALUES ──', VALID_TYPES, VALID_STATUSES, VALID_CLOSURE + ' (only if Status=Closed)', VALID_PRIORITY, '', 'MM/DD/YYYY', 'MM/DD/YYYY', 'MM/DD/YYYY (optional)', 'number (optional, no $ or commas)'],
     [],
-    ['RFP-001', 'Example: State DOT Highway Corridor RFP', 'RFP', 'Stakeholder Review', 'Critical', 'Sarah M.', '03/12/2026', '05/11/2026', '05/27/2026', '8', '1250000'],
-    ['BD-001',  'Example: Midwest Rail Corridor Expansion', 'BD', 'In Progress', 'High', 'Tom R.', '04/08/2026', '05/12/2026', '', '14', ''],
-    ['IDR-001', 'Example: AI Site Assessment Tool', 'Idea', 'Validating', 'Medium', 'Priya S.', '04/18/2026', '05/10/2026', '', '15', '750000'],
+    ['RFP-001', 'Example: State DOT Highway Corridor RFP', 'RFP', 'Stakeholder Review', '', 'Critical', 'Sarah M.', '03/12/2026', '05/11/2026', '05/27/2026', '1250000'],
+    ['BD-001',  'Example: Midwest Rail Corridor Expansion', 'BD', 'In Progress', '', 'High', 'Tom R.', '04/08/2026', '05/12/2026', '', ''],
+    ['IDR-001', 'Example: AI Site Assessment Tool', 'Idea', 'Closed', 'Passed', 'Medium', 'Priya S.', '04/18/2026', '05/10/2026', '', '750000'],
   ];
   const csv = rows.map(r => r.map(escCsv).join(',')).join('\r\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -1651,16 +1646,16 @@ function importCsv(text) {
 
   const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase());
   const idx = {
-    id:     headers.findIndex(h => h.includes('id')),
-    title:  headers.findIndex(h => h.includes('title')),
-    type:   headers.findIndex(h => h.includes('type')),
-    status: headers.findIndex(h => h.includes('status') && !h.includes('days')),
+    id:      headers.findIndex(h => h.includes('id')),
+    title:   headers.findIndex(h => h.includes('title')),
+    type:    headers.findIndex(h => h.includes('type')),
+    status:  headers.findIndex(h => h.includes('status') && !h.includes('days')),
+    closure: headers.findIndex(h => h.includes('closure') || h.includes('reason')),
     priority: headers.findIndex(h => h.includes('priority')),
-    owner:  headers.findIndex(h => h.includes('owner')),
+    owner:   headers.findIndex(h => h.includes('owner')),
     created: headers.findIndex(h => h.includes('created')),
     updated: headers.findIndex(h => h.includes('updated') || h.includes('last')),
     target:  headers.findIndex(h => h.includes('target')),
-    days:    headers.findIndex(h => h.includes('days')),
     value:   headers.findIndex(h => h.includes('spend')),
     desc:    headers.findIndex(h => h.includes('description')),
     notes:   headers.findIndex(h => h.includes('notes')),
@@ -1675,18 +1670,23 @@ function importCsv(text) {
     // skip blank rows and the reference row
     if (!id || id.startsWith('──')) continue;
 
-    const status = cols[idx.status] || '';
+    let status = cols[idx.status] || '';
+    let closureReason = idx.closure >= 0 ? (cols[idx.closure] || '').trim() : '';
+    // Auto-map legacy closed statuses
+    if (LEGACY_CLOSED.includes(status)) {
+      closureReason = status;
+      status = 'Closed';
+    }
     if (!ALL_STATUSES.includes(status)) {
       warnings.push(`Row ${i+1} (${id}): unknown status "${status}" — skipped`);
       continue;
     }
     const type = cols[idx.type] || '';
-    if (!['RFP','Partner','BD','Idea'].includes(type)) {
+    if (!['RFP','Partner','BD','Idea','Admin'].includes(type)) {
       warnings.push(`Row ${i+1} (${id}): unknown type "${type}" — skipped`);
       continue;
     }
 
-    const daysVal = parseInt(cols[idx.days], 10);
     const created = parseDate(cols[idx.created]);
     const updated = parseDate(cols[idx.updated]);
     const target  = parseDate(cols[idx.target]);
@@ -1696,17 +1696,15 @@ function importCsv(text) {
       title:        cols[idx.title] || '(no title)',
       type,
       status,
+      closure_reason: closureReason,
       priority:     cols[idx.priority] || 'Medium',
       owner:        cols[idx.owner] || '—',
       created_date: created || new Date().toISOString().split('T')[0],
       last_updated: updated || new Date().toISOString().split('T')[0],
       target_date:  target,
-      status_in_days: isNaN(daysVal) ? 0 : daysVal,
       is_active:    isActive(status),
       is_closed:    isClosed(status),
-      days_in_status: isNaN(daysVal) ? 0 : daysVal,
-      total_cycle_time: isNaN(daysVal) ? 0 : daysVal,
-      status_change_history: [{ s: status, days: isNaN(daysVal) ? 0 : daysVal }],
+      status_change_history: [{ s: status }],
       spend_to_date: idx.value >= 0 ? (parseFloat(String(cols[idx.value]).replace(/[$,]/g, '')) || 0) : 0,
       description: idx.desc  >= 0 ? (cols[idx.desc]  || '').trim() : '',
       notes:       idx.notes >= 0 ? (cols[idx.notes] || '').trim() : '',
