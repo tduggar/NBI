@@ -758,7 +758,7 @@
         <div class="guide-status-def">Work has been submitted or presented and is awaiting a decision from stakeholders or an external party.</div>
       </div>
       <div class="guide-item">
-        <div class="guide-status-name">Finalizing</div>
+        <div class="guide-status-name">Contracting</div>
         <div class="guide-status-def">A commitment has been received and the team is working through contracts and scope to prepare for execution.</div>
         <div class="guide-status-note">Applies to RFPs and BD opportunities only.</div>
       </div>
@@ -864,7 +864,7 @@
     <option>Evaluating</option>
     <option>In Progress</option>
     <option>Stakeholder Review</option>
-    <option>Finalizing</option>
+    <option>Contracting</option>
     <option>In Development</option>
     <option>Validating</option>
     <option disabled>── Closed ──</option>
@@ -950,7 +950,7 @@
 // ─────────────────────────────────────────────
 const ACTIVE_STATUSES = [
   'Identified', 'Evaluating', 'In Progress', 'Stakeholder Review',
-  'Finalizing', 'In Development', 'Validating'
+  'Contracting', 'In Development', 'Validating'
 ];
 const CLOSED_STATUSES = ['Closed'];
 const CLOSURE_REASONS = ['Passed', 'Shelved', 'Closed', 'No Award', 'No Contract', 'Scrapped'];
@@ -961,7 +961,7 @@ const KANBAN_ORDER = [...ACTIVE_STATUSES, ...CLOSED_STATUSES];
 
 const STATUS_GROUPS = [
   { label: 'Backlog',      color: '#0052cc', statuses: ['Identified', 'Evaluating'] },
-  { label: 'Active Work',  color: '#006644', statuses: ['In Progress', 'Stakeholder Review', 'Finalizing', 'In Development', 'Validating'] },
+  { label: 'Active Work',  color: '#006644', statuses: ['In Progress', 'Stakeholder Review', 'Contracting', 'In Development', 'Validating'] },
   { label: 'Closed/Done',  color: '#36b37e', statuses: ['Closed'] },
 ];
 
@@ -1111,7 +1111,7 @@ function renderSummary(items) {
 
   const statusColors = {
     'Identified':'#0052cc','Evaluating':'#0747a6','In Progress':'#006644',
-    'Stakeholder Review':'#00875a','Finalizing':'#5243aa','In Development':'#8777d9',
+    'Stakeholder Review':'#00875a','Contracting':'#5243aa','In Development':'#8777d9',
     'Validating':'#ff8b00','Passed':'#36b37e','Shelved':'#6b778c',
     'Closed':'#97a0af','No Award':'#de350b','No Contract':'#ff5630','Scrapped':'#bf2600'
   };
@@ -1319,8 +1319,13 @@ function openModal(id) {
     <div class="modal-row">
       <div class="modal-field">
         <div class="field-label">Status</div>
-        <div class="field-value">${statusTag}${item.closure_reason ? ` <span class="tag tag-status-closed" style="margin-left:4px">${item.closure_reason}</span>` : ''}</div>
+        <div class="field-value">${statusTag}</div>
       </div>
+      ${item.closure_reason ? `
+      <div class="modal-field">
+        <div class="field-label">Closure Reason</div>
+        <div class="field-value"><span class="tag tag-status-closed" style="font-size:13px;padding:3px 10px">${item.closure_reason}</span></div>
+      </div>` : ''}
       <div class="modal-field">
         <div class="field-label">Type</div>
         <div class="field-value"><span class="tag tag-${typeClass(item.type)}">${item.type}</span></div>
