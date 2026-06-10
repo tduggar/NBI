@@ -478,7 +478,7 @@
   }
   .kanban-board {
     display: grid;
-    grid-template-columns: 90px repeat(13, 220px);
+    /* column count set dynamically by renderKanban */
     min-width: max-content;
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -1246,6 +1246,7 @@ function cardHtml(item) {
 
 function renderKanban(items) {
   const board = document.getElementById('kanban-board');
+  board.style.gridTemplateColumns = `90px repeat(${KANBAN_ORDER.length}, 220px)`;
 
   // build byTypeStatus map
   const byTypeStatus = {};
